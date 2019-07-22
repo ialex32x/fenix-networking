@@ -142,14 +142,13 @@ namespace Fenix.Net
         }
     }
 
-    public class StreamSessionManager : MessageManager
+    public abstract class StreamSessionManager : MessageManager
     {
         private StreamPacketizer _packetizer;
 
         protected override void OnInitialize()
         {
             _packetizer = new StreamPacketizer();
-            _conn = new TcpConnection();
             base.OnInitialize();
         }
 
@@ -176,6 +175,15 @@ namespace Fenix.Net
                     }
                 }
             }
+        }
+    }
+
+    public class TcpSessionManager : StreamSessionManager
+    {
+        protected override void OnInitialize()
+        {
+            _conn = new TcpConnection();
+            base.OnInitialize();
         }
     }
 
