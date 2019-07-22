@@ -15,13 +15,16 @@ namespace Fenix.Net
         public const Int32 PacketSizeMax = 1024 * 512;
 
         private Int32 _length;
-        private MemoryStream _buffer = new MemoryStream();
+        private ByteBuffer _buffer;
         private Queue<ByteBuffer> _packet = new Queue<ByteBuffer>(32);
 
         public void Clear()
         {
-            _buffer.Seek(0, SeekOrigin.Begin);
-            _buffer.SetLength(0);
+            if (_buffer != null)
+            {
+                _buffer.Release();
+                _buffer = null;
+            }
             _length = default(Int32);
             var packet = _packet.Dequeue();
             while (packet != null)
@@ -36,35 +39,38 @@ namespace Fenix.Net
         {
             if (size > 0)
             {
-                if (_length < 0)
+                if (_buffer == null)
                 {
-                    var need = HeadSize - (int)_buffer.Position;
+                    _buffer = ByteBufferPooledAllocator.Default.Alloc(PacketSizeMax);
+                }
+                if (_length <= 0)
+                {
+                    var need = HeadSize - _buffer.writerIndex;
                     if (size < need)
                     {
-                        _buffer.Write(data, offset, size);
+                        _buffer.WriteBytes(data, offset, size);
                         return 0;
                     }
-                    _buffer.Write(data, offset, need);
+                    _buffer.WriteBytes(data, offset, need);
                     var left = size - need;
                     offset += need;
-                    _length = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(_buffer.ToArray(), 0)) - HeadSize;
-                    _buffer.SetLength(0);
+                    _length = _buffer.ReadInt32() - HeadSize;
+                    _buffer.writerIndex = 0;
+                    _buffer.readerIndex = 0;
                     return InputBytes(data, offset, left);
                 }
                 else
                 {
-                    var need = _length - (int)_buffer.Position;
+                    var need = _length - (int)_buffer.writerIndex;
                     if (size < need)
                     {
-                        _buffer.Write(data, offset, size);
+                        _buffer.WriteBytes(data, offset, size);
                         return 0;
                     }
-                    _buffer.Write(data, offset, need);
+                    _buffer.WriteBytes(data, offset, need);
                     _NewPacket();
                     var left = size - need;
                     offset += need;
-                    _length = -1;
-                    _buffer.SetLength(0);
                     return 1 + InputBytes(data, offset, left);
                 }
             }
@@ -73,14 +79,8 @@ namespace Fenix.Net
 
         private void _NewPacket()
         {
-            _buffer.Seek(0L, SeekOrigin.Begin);
-            var size = (int)_buffer.Length;
-            var byteBuffer = ByteBufferPooledAllocator.Default.Alloc(size);
-            byteBuffer.WriteBytes(_buffer, size);
-
-            _packet.Enqueue(byteBuffer);
-            _buffer.Seek(0L, SeekOrigin.Begin);
-            _buffer.SetLength(0L);
+            _packet.Enqueue(_buffer);
+            _buffer = null;
             _length = default(Int32);
         }
 

@@ -11,8 +11,8 @@ namespace Fenix.Net
         public Action onConnecting;
         public Action onConnected;
         public Action onClosed;
-        public Action<int, int, byte[]> onReceived;
-        
+        public Action<ByteBuffer> onReceived;
+
         protected Connection _conn;
 
         public ConnectionError error
@@ -133,23 +133,11 @@ namespace Fenix.Net
             }
         }
 
-        protected void Deserialize(ByteBuffer byteBuffer)
+        protected void OnReceived(ByteBuffer byteBuffer)
         {
-            try
+            if (onReceived != null)
             {
-                var msg_id = byteBuffer.ReadInt16();
-                var session_id = byteBuffer.ReadInt32();
-                var msg = byteBuffer.ReadAllBytes();
-
-                // Debug.LogFormat("msg {0}, {1}, {2}", session_id, msg_id, msg.Length);
-                if (onReceived != null) 
-                {
-                    onReceived(session_id, msg_id, msg);
-                }
-            }
-            catch (Exception exception)
-            {
-                Debug.LogErrorFormat("{0}", exception);
+                onReceived(byteBuffer);
             }
         }
     }
@@ -178,9 +166,9 @@ namespace Fenix.Net
                     {
                         break;
                     }
-                    try 
+                    try
                     {
-                        this.Deserialize(packet);
+                        OnReceived(packet);
                     }
                     finally
                     {
