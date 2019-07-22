@@ -20,7 +20,7 @@ namespace Fenix.IO
         private int _readPosition;  // 当前观察位置 （网络数据写入时会用到）
         private int _maxCapacity;
 
-        // private System.Diagnostics.StackTrace _stackTrace;
+        private string _stacktrace = null;
 
         // 内部数据
         public byte[] data { get { return _data; } }
@@ -92,23 +92,7 @@ namespace Fenix.IO
         {
             if (_refCount != 0)
             {
-                // if (_stackTrace != null)
-                // {
-                //     string debugInfo = "";
-                //     for(var i = 0; i< _stackTrace.FrameCount; i++)
-                //     {
-                //         // Note that high up the call stack, there is only
-                //         // one stack frame.
-                //         var stackFrame = _stackTrace.GetFrame(i);
-                //         debugInfo += string.Format("High up the call stack, Method: {0}\n", stackFrame.GetMethod());
-                //         debugInfo += string.Format("High up the call stack, Line Number: {0}\n", stackFrame.GetFileLineNumber());
-                //     }
-                //     Debug.LogError(debugInfo);
-                // } 
-                // else
-                {
-                    Debug.LogErrorFormat("ByteBuffer leaked {0} {1}", GetHashCode(), _refCount);
-                }
+                Debug.LogErrorFormat("ByteBuffer leaked {0} {1}\n{2}", GetHashCode(), _refCount, _stacktrace ?? "");
             }
         }
 
@@ -119,7 +103,7 @@ namespace Fenix.IO
             {
                 _writePosition = 0;
                 _readPosition = 0;
-                // _stackTrace = null;
+                _stacktrace = null;
                 if (_allocator != null)
                 {
                     // Debug.LogFormat("<< ByteBuffer released {0}", GetHashCode());
@@ -136,7 +120,17 @@ namespace Fenix.IO
             {
                 if (_allocator != null && _allocator.traceMemoryLeak)
                 {
-                    // _stackTrace = new System.Diagnostics.StackTrace(true);
+                    var stackTrace = new System.Diagnostics.StackTrace(true);
+                    string debugInfo = "";
+                    for (var i = 0; i < stackTrace.FrameCount; i++)
+                    {
+                        // Note that high up the call stack, there is only
+                        // one stack frame.
+                        var stackFrame = stackTrace.GetFrame(i);
+                        debugInfo += string.Format("High up the call stack, Method: {0}\n", stackFrame.GetMethod());
+                        debugInfo += string.Format("High up the call stack, Line Number: {0}\n", stackFrame.GetFileLineNumber());
+                    }
+                    _stacktrace = debugInfo;
                 }
                 // Debug.LogFormat(">> ByteBuffer allocated {0}", GetHashCode());
             }
