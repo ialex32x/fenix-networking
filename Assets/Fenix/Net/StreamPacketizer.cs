@@ -4,31 +4,25 @@ using System.Net;
 
 namespace Fenix.Net
 {
-    using LengthType = Int32;
     using System.IO;
     using Fenix.IO;
 
     // 非线程安全
     public class StreamPacketizer
     {
-        public const int HeadSizeTranslate = sizeof(LengthType); // 长度信息 - Translate = 协议体长度
-        public const int HeadSize = sizeof(LengthType);
-        public const LengthType PacketSizeMax = 1024 * 512;
+        public const int HeadSizeTranslate = sizeof(Int32); // 长度信息 - Translate = 协议体长度
+        public const int HeadSize = sizeof(Int32);
+        public const Int32 PacketSizeMax = 1024 * 512;
 
-        public static LengthType ToLength(byte[] data, int index)
-        {
-            return (LengthType)IPAddress.NetworkToHostOrder(BitConverter.ToInt32(data, index));
-        }
-
-        private LengthType _len;
-        private MemoryStream _ms = new MemoryStream();
+        private Int32 _length;
+        private MemoryStream _buffer = new MemoryStream();
         private Queue<ByteBuffer> _packet = new Queue<ByteBuffer>(32);
 
         public void Clear()
         {
-            _ms.Seek(0, SeekOrigin.Begin);
-            _ms.SetLength(0);
-            _len = default(LengthType);
+            _buffer.Seek(0, SeekOrigin.Begin);
+            _buffer.SetLength(0);
+            _length = default(Int32);
             var packet = _packet.Dequeue();
             while (packet != null)
             {
@@ -38,134 +32,75 @@ namespace Fenix.Net
             _packet.Clear();
         }
 
-        public int InputBytes(byte[] inData, int inDataOffset, int inDataLenAll)
+        public int InputBytes(byte[] data, int offset, int size)
         {
-            var inDataLenRelative = inDataLenAll - inDataOffset;
-            // 现有数据 + 可加入数据的总长度
-            var sizeInStream = _ms.Position + inDataLenRelative;
-
-            if (_len == default(LengthType))
+            if (size > 0)
             {
-                // 已经写入+可写入是否可以组成头部长度
-                if (sizeInStream < HeadSize)
+                if (_length < 0)
                 {
-                    _ms.Write(inData, inDataOffset, inDataLenRelative);
-                    return 0;
+                    var need = HeadSize - (int)_buffer.Position;
+                    if (size < need)
+                    {
+                        _buffer.Write(data, offset, size);
+                        return 0;
+                    }
+                    _buffer.Write(data, offset, need);
+                    var left = size - need;
+                    offset += need;
+                    _length = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(_buffer.ToArray(), 0)) - HeadSize;
+                    _buffer.SetLength(0);
+                    return InputBytes(data, offset, left);
                 }
                 else
                 {
-                    // 还需补充多少字节才能构成头部长度
-                    var writeBytes = HeadSize - (int)_ms.Position;
-
-                    if (writeBytes > 0)
+                    var need = _length - (int)_buffer.Position;
+                    if (size < need)
                     {
-                        _ms.Write(inData, inDataOffset, writeBytes);
-                    }
-                    _ms.Flush();
-                    var fuck_data = _ms.ToArray();
-                    var raw_size = ToLength(fuck_data, 0);
-
-                    if (raw_size > PacketSizeMax)
-                    {
-                        throw new Exception("包长度错误");
-                    }
-                    // 剔除长度占用的部分(得到的长度包括长度自身), 然后从缓冲区丢弃
-                    _len = raw_size - HeadSizeTranslate;
-                    _ms.Seek(0, SeekOrigin.Begin);
-                    _ms.SetLength(0);
-
-                    // 得到原始数据流剩余数据
-                    var leftSize = inDataLenRelative - writeBytes;
-
-                    //UnityEngine.Debug.LogFormat("len: {0} leftSize: {1} writeBytes: {2}", _len, leftSize, writeBytes);
-                    if (leftSize == 0)
-                    {
-                        // 如果服务器的包体有可能为空的, 注释掉该条件
+                        _buffer.Write(data, offset, size);
                         return 0;
                     }
-
-                    if (leftSize < _len)
-                    {
-                        // 剩余数据少于指定长度，直接写入即可
-                        _ms.Write(inData, inDataOffset + writeBytes, leftSize);
-                        return 0;
-                    }
-
-                    if (leftSize == _len)
-                    {
-                        // 剩余数据刚好等于指定长度，直接组包即可
-                        _NewPacket(inData, inDataOffset + writeBytes);
-                        return 1;
-                    }
-
-                    // 1、剩余数据大于当前packet长度，写入长度内的部分组包
-                    // 2、递归调用InputBytes写入超出部分
-                    _ms.Write(inData, inDataOffset + writeBytes, (int)_len);
-                    writeBytes += (int)_len;
+                    _buffer.Write(data, offset, need);
                     _NewPacket();
-                    return 1 + InputBytes(inData, inDataOffset + writeBytes, inDataLenAll);
+                    var left = size - need;
+                    offset += need;
+                    _length = -1;
+                    _buffer.SetLength(0);
+                    return 1 + InputBytes(data, offset, left);
                 }
             }
-            else
-            {
-                // 如果总长度 少于 需要读取的长度，那么可以直接全部写入
-                if (sizeInStream < _len)
-                {
-                    _ms.Write(inData, inDataOffset, inDataLenRelative);
-                    return 0;
-                }
-
-                // 如果总长度 等于 需要读取的长度，那么全部写入，并且组包
-                if (sizeInStream == _len)
-                {
-                    _ms.Write(inData, inDataOffset, inDataLenRelative);
-                    _NewPacket();
-                    return 1;
-                }
-
-                // 如果总长度 超过 需要读取的总长度，那么写入一部分
-                var writeBytes = (int)_len - (int)_ms.Position;
-                _ms.Write(inData, inDataOffset, writeBytes);
-                _NewPacket();
-                return 1 + InputBytes(inData, inDataOffset + writeBytes, inDataLenAll);
-            }
+            return 0;
         }
 
-        private void _NewPacket(byte[] data, int offset)
+        private void _NewPacket()
         {
-            var byteBuffer = ByteBufferPooledAllocator.Default.Alloc(_len);
-            byteBuffer.WriteBytes(data, offset, _len);
-            _packet.Enqueue(byteBuffer);
-            _ms.Seek(0L, SeekOrigin.Begin);
-            _ms.SetLength(0L);
-            _len = default(LengthType);
-        }
-
-        private void _NewPacket() {
-            _ms.Seek(0L, SeekOrigin.Begin);
-            var size = (int)_ms.Length;
+            _buffer.Seek(0L, SeekOrigin.Begin);
+            var size = (int)_buffer.Length;
             var byteBuffer = ByteBufferPooledAllocator.Default.Alloc(size);
-            byteBuffer.WriteBytes(_ms, size);
+            byteBuffer.WriteBytes(_buffer, size);
 
             _packet.Enqueue(byteBuffer);
-            _ms.Seek(0L, SeekOrigin.Begin);
-            _ms.SetLength(0L);
-            _len = default(LengthType);
+            _buffer.Seek(0L, SeekOrigin.Begin);
+            _buffer.SetLength(0L);
+            _length = default(Int32);
         }
 
-        public ByteBuffer CreatePacket() {
-            if (_packet.Count != 0) {
+        public ByteBuffer CreatePacket()
+        {
+            if (_packet.Count != 0)
+            {
                 ByteBuffer packet = _packet.Dequeue();
                 return packet;
             }
             return null;
         }
 
-        public static void _Dump(byte[] data) {
+        public static void _Dump(byte[] data)
+        {
             _Dump("NONAME", data, 0, data.Length);
         }
 
-        public static void _Dump(string name, byte[] data) {
+        public static void _Dump(string name, byte[] data)
+        {
             _Dump(name, data, 0, data.Length);
         }
 

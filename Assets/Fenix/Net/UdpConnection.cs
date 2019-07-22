@@ -6,12 +6,15 @@ using System.Net;
 using System.Net.Sockets;
 using System.IO;
 
-namespace Fenix.Net {
+namespace Fenix.Net
+{
     using UnityEngine;
 
-    public class UdpConnection : Connection {
+    public class UdpConnection : Connection
+    {
         // 创建udp连接, port可以指定端口 (0 表示由系统自动分配)
-        public UdpConnection(int localPort) {
+        public UdpConnection(int localPort)
+        {
             var localEndPoint = new IPEndPoint(IPAddress.Any, localPort);
             var socket = new Socket(localEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
             socket.Bind(localEndPoint);
@@ -22,9 +25,11 @@ namespace Fenix.Net {
             this._state = ConnectionState.Connected;
         }
 
-        public UdpConnection(int localPort, string remoteAddress, int remotePort) {
+        public UdpConnection(int localPort, string remoteAddress, int remotePort)
+        {
             IPAddress ipAddress;
-            if (string.IsNullOrEmpty(remoteAddress) || !IPAddress.TryParse(remoteAddress, out ipAddress)) {
+            if (string.IsNullOrEmpty(remoteAddress) || !IPAddress.TryParse(remoteAddress, out ipAddress))
+            {
                 throw new Exception();
             }
 
@@ -38,8 +43,9 @@ namespace Fenix.Net {
             this._state = ConnectionState.Connected;
         }
 
-        public override void BeginConnect() {
+        public override void BeginConnect()
+        {
             // UDP 无需显式连接
-        } 
+        }
     }
 }

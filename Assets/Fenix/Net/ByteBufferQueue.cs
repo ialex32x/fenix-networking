@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Fenix.Net
 {
     using Fenix.IO;
-    
+
     public class ByteBufferQueue
     {
         private LinkedList<ByteBuffer> _sendQ = new LinkedList<ByteBuffer>();

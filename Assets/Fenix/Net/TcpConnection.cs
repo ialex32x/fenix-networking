@@ -6,22 +6,28 @@ using System.Net;
 using System.Net.Sockets;
 using System.IO;
 
-namespace Fenix.Net {
+namespace Fenix.Net
+{
     using UnityEngine;
 
-    public class TcpConnection : Connection {
-        public TcpConnection() {
+    public class TcpConnection : Connection
+    {
+        public TcpConnection()
+        {
             this._state = ConnectionState.Closed;
         }
-        
-        public TcpConnection(IPEndPoint remoteEndPoint) {
+
+        public TcpConnection(IPEndPoint remoteEndPoint)
+        {
             this._remoteEndPoint = remoteEndPoint;
             this._state = ConnectionState.Closed;
         }
 
         // tcp method
-        public override void BeginConnect() {
-            try {
+        public override void BeginConnect()
+        {
+            try
+            {
                 Close();
                 _sock = new Socket(_remoteEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                 _state = ConnectionState.Connecting;
@@ -29,7 +35,9 @@ namespace Fenix.Net {
                 // _Log(string.Format("正在连接 {0}", _remoteEndPoint));
                 if (Connecting != null)
                     Connecting();
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 _error = ConnectionError.ConnectionError;
                 _state = ConnectionState.Closing;
                 _ThreadedLog(e.ToString());
@@ -37,28 +45,38 @@ namespace Fenix.Net {
         }
 
         // tcp method
-        private void _OnBeginConnect(IAsyncResult ar) {
-            try {
-                if (_state == ConnectionState.Closing || _state == ConnectionState.Closed) {
+        private void _OnBeginConnect(IAsyncResult ar)
+        {
+            try
+            {
+                if (_state == ConnectionState.Closing || _state == ConnectionState.Closed)
+                {
                     //_ThreadedLog("Connect 回调时已经请求关闭socket");
                     return;
                 }
                 var sock = (Socket)ar.AsyncState;
                 sock.EndConnect(ar);
 
-                if (sock.Connected) {
+                if (sock.Connected)
+                {
                     _state = ConnectionState.Connected;
-                } else {
+                }
+                else
+                {
                     _ThreadedLog("fail to connect");
                     _error = ConnectionError.ConnectionError;
                     _state = ConnectionState.Closing;
                 }
-            } catch (SocketException socketException)  {
+            }
+            catch (SocketException socketException)
+            {
                 // var err = socketException.SocketErrorCode;
                 _error = FromSocketError(socketException.SocketErrorCode);
                 _state = ConnectionState.Closing;
                 _ThreadedLog(socketException.ToString());
-            } catch (Exception err) {
+            }
+            catch (Exception err)
+            {
                 _error = ConnectionError.ConnectionError;
                 _state = ConnectionState.Closing;
                 _ThreadedLog(err.ToString());

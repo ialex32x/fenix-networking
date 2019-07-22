@@ -7,11 +7,11 @@ namespace Fenix.IO
 {
     public class ByteBufferPooledAllocator : ByteBufferAllocator
     {
-        #if UNITY_EDITOR
+#if UNITY_EDITOR
         public static readonly ByteBufferPooledAllocator Default = new ByteBufferPooledAllocator(16, ByteBufferAllocator.DEFAULT_SIZE, ByteBufferAllocator.DEFAULT_MAX_CAPACITY, true);
-        #else
+#else
         public static readonly ByteBufferPooledAllocator Default = new ByteBufferPooledAllocator(16, ByteBufferAllocator.DEFAULT_SIZE, ByteBufferAllocator.DEFAULT_MAX_CAPACITY, false);
-        #endif
+#endif
 
         private int _maxCapacity;
         private object __mutex = new object();
@@ -22,7 +22,7 @@ namespace Fenix.IO
         {
             _maxCapacity = maxCapacity;
             _traceMemoryLeak = traceMemoryLeak;
-            
+
             lock (__mutex)
             {
                 __freelist = new List<ByteBuffer>(count);

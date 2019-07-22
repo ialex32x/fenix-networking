@@ -54,7 +54,7 @@ namespace Fenix.IO
         {
             throw new NotSupportedException();
         }
-        
+
         public override void Write(byte[] src, int srcOffset, int count)
         {
             _byteBuffer.WriteBytes(src, srcOffset, count);

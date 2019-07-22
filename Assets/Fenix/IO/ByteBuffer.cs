@@ -27,12 +27,12 @@ namespace Fenix.IO
 
         public int capacity { get { return _data.Length; } }
 
-        public int writerIndex 
+        public int writerIndex
         {
             get { return _writePosition; }
-            set 
+            set
             {
-                if (_writePosition != value) 
+                if (_writePosition != value)
                 {
                     if (value < 0 || value > _maxCapacity)
                     {
@@ -200,7 +200,7 @@ namespace Fenix.IO
         // 读取所有可读取的字节并返回
         public byte[] ReadAllBytes()
         {
-            if (readableBytes == 0) 
+            if (readableBytes == 0)
             {
                 return null;
             }
